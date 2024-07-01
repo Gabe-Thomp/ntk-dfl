@@ -1,0 +1,57 @@
+# device: "cuda" | "cpu"
+device: cuda
+debug: true
+
+# distributed networks
+# users:            number of users
+rounds: 20
+users: 300
+
+# Selects 20 per round
+part_rate: 0.07
+
+lr: 0.001
+# Hard coded based on training data set size. For example, 60000 fashion mnist images/300 users = 200 batch size
+# I think this only applies to 
+local_batch_size: 200 #200
+
+loss: "ce"
+
+taus:
+- 100
+- 200
+- 300 
+- 400
+- 500
+- 600
+- 700
+- 800
+- 900
+- 1000
+- 1500
+- 2000
+
+# Dataset configurations
+train_data_dir: data/fmnist/train.dat
+test_data_dir:  data/fmnist/test.dat
+#iid: true
+#user_with_data: ""
+
+# OR USE IF NON-IID
+iid: false
+user_with_data: "data/user_with_data/fmnist300/a0.4/user_dataidx_map_0.40_0.dat"
+
+
+datapoint_size:
+- 28
+- 28
+channels: 1
+label_size: 10
+
+# Log and record configurations
+record_dir:  ../{}.dat
+log_level:   "INFO"
+log_file:    "./train.log"
+
+model: "mlp"
+full_weight_dir: ""
