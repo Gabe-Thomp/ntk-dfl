@@ -37,6 +37,7 @@ class LocalUpdater(object):
         """
         try:
             # Initialize variables from user_resource
+            self.device = config.device
             self.lr = user_resource["lr"]
             self.batch_size = user_resource["batch_size"]
 
@@ -90,8 +91,10 @@ class LocalUpdater(object):
 
         return acc_omega
 
-    def local_step(self, model, tau=None):
-        self.jac_mats = jacobian(model, self.xs)
+    def local_step(self, model, tau=None, device=None):
+        if device is None:
+            device = self.device
+        self.jac_mats = jacobian(model, self.xs, device=device)
 
     def uplink_transmit(self):
         """Simulate the transmission of local weights to the central server.

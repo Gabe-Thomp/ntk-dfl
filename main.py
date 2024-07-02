@@ -66,7 +66,10 @@ def train(model, config, logger, record):
             # Gets the local jacobians for a given client specified in local_updater
             
             
-            local_updater.local_step(model)
+            if config.gpu_intensive:
+                local_updater.local_step(model, device=config.device)
+            else:
+                local_updater.local_step(model, device="cpu")
             # Simulate uplink transmission
             local_package = local_updater.uplink_transmit()
             # Append this clients jacobians to the list
@@ -84,7 +87,10 @@ def train(model, config, logger, record):
             torch.cuda.empty_cache()
 
         start_time = time.time()
-        global_jac = combine_local_jacobians(local_packages)
+        if config.gpu_intensive:
+            global_jac = combine_local_jacobians(local_packages, device=config.device)
+        else:
+            global_jac = combine_local_jacobians(local_packages, device="cpu")
 
         
         del local_packages
@@ -99,17 +105,28 @@ def train(model, config, logger, record):
         print("kernel computation time {:3f}".format(time.time() - start_time))
 
         # Returns a function that, given t and f_0, solves for f_t
-        predictor = gradient_descent_ce(global_kernel.cpu(), global_ys.cpu(), config.lr)
+        if config.gpu_intensive:
+            predictor = gradient_descent_ce(global_kernel, global_ys, config.lr)
+            # Configure maximum t as one more than the largest tau value
+            t = torch.arange(config.taus[-1]+1, device=config.device)
+        else:
+            predictor = gradient_descent_ce(global_kernel.to("cpu"), global_ys.to("cpu"), config.lr)
+            # Configure maximum t as one more than the largest tau value
+            t = torch.arange(config.taus[-1]+1, device="cpu")
         
         # This is f^(0) (X)
         with torch.no_grad():
             fx_0 = model(global_xs)
 
-        # Configure maximum t as one more than the largest tau value
-        t = torch.arange(config.taus[-1]+1)
+        
+        
         
         # Create f_x using the time values and the initial f_x
-        fx_train = predictor(t, fx_0.cpu())
+        
+        if config.gpu_intensive:
+            fx_train = predictor(t, fx_0)
+        else:
+            fx_train = predictor(t, fx_0.to("cpu"))
         # fx_train = fx_train.to(fx_0)
         
         # Use current weights to pass to the optimizer
@@ -123,13 +140,16 @@ def train(model, config, logger, record):
         for i, tau in enumerate(config.taus):
             # initialize the weight aggregator with current weights
             weight_aggregator = WeightMod(init_state_dict)
-            global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
-                    global_ys.cpu(), fx_train[:tau+1], config.loss, 
-                    model.state_dict())
-            # global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
-            #         global_ys, fx_train[:tau+1], config.loss, 
-            #         model.state_dict())        
             
+            if config.gpu_intensive:
+                global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
+                    global_ys, fx_train[:tau+1], config.loss, 
+                    model.state_dict())        
+            else:
+                global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
+                        global_ys.to("cpu"), fx_train[:tau+1], config.loss, 
+                        model.state_dict())
+                
             # Complete the sum in 9b
             weight_aggregator.add(global_omegas)
             aggregated_weight = weight_aggregator.state_dict()

@@ -344,7 +344,7 @@ def main(config_file):
     
     if config.device == "cuda":
         torch.backends.cudnn.benchmark = True
-        # torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.deterministic = True
 
     # Record topology
     record["topology"] = config.topology

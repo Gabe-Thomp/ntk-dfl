@@ -23,6 +23,71 @@ from fedlearning.dataset import *
 from fedlearning.evolve import *
 from fedlearning.optimizer import GlobalUpdater, LocalUpdater, get_omegas
 
+import torch.optim as optim
+from torch.utils.data import Dataset, DataLoader
+from torchvision import datasets, transforms
+
+class NumpyDataset(Dataset):
+    def __init__(self, data, targets, transform=None):
+        """
+        Args:
+            data (numpy array): Array of data samples.
+            targets (numpy array): Array of labels corresponding to the data samples.
+            transform (callable, optional): Optional transform to be applied on a sample.
+        """
+        self.data = data
+        self.targets = targets
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        sample = self.data[idx]
+        target = self.targets[idx]
+        
+        if self.transform:
+            sample = self.transform(sample)
+        
+        return sample, target
+
+def numpy_to_tensor_transform(data):
+    return torch.from_numpy(data)
+
+def self_train(user_model, user_id, dataset, config, logger, loss_fn, batch_size=32, epochs=1, lr = 0.001, verbose=False): 
+    # Get data corresponding to a certain user
+    user_resource = assign_user_resource(config, user_id, 
+                        dataset["train_data"], dataset["user_with_data"])
+    
+    # Define the optimizer
+    optimizer = optim.SGD(user_model.parameters(), lr=lr)
+    dataset = NumpyDataset(user_resource["images"], user_resource["labels"], transform=numpy_to_tensor_transform)
+
+    user_data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+   
+    for epoch in range(epochs):
+        # Iterate over the user's data
+        for batch_idx, (data, target) in enumerate(user_data_loader):
+            data, target = data.to(config.device), target.to(config.device)
+            # Clear the gradients
+            optimizer.zero_grad()
+            
+            # Forward pass
+            output = user_model(data)
+            
+            # Compute the loss
+            loss = loss_fn(output, target)
+            
+            # Backward pass
+            loss.backward()
+            
+            # Update the model parameters
+            optimizer.step()
+
+            if batch_idx % 100 == 0:
+                if verbose: logger.info(f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(user_data_loader.dataset)} ({100. * batch_idx / len(user_data_loader):.0f}%)]\tLoss: {loss.item():.6f}')
+    if verbose: print()
+
 def create_random_graph(n, p, graph_name=None):
     # Generate the graph
     G = nx.erdos_renyi_graph(n, p)
@@ -124,13 +189,8 @@ def train(config, logger, record, loaded_record):
             user_resource = assign_user_resource(config, user_id, 
                                     dataset["train_data"], dataset["user_with_data"])
             local_updater = LocalUpdater(config, user_resource)
-            
-            
             # Gets the local jacobians for a given client specified in local_updater
-            if config.gpu_intensive:
-                local_updater.local_step(model, device=config.device)
-            else:
-                local_updater.local_step(model, device="cpu")
+            local_updater.local_step(model)
             # Simulate uplink transmission
             local_package = local_updater.uplink_transmit()
             # Append this clients jacobians to the list
@@ -152,12 +212,8 @@ def train(config, logger, record, loaded_record):
         model = model_dict[client_id]
 
         start_time = time.time()
-        if config.gpu_intensive:
-            global_jac = combine_local_jacobians(local_packages, device=config.device)
-        else:
-            global_jac = combine_local_jacobians(local_packages, device="cpu")
-        
-        del local_packages
+        global_jac = combine_local_jacobians(local_packages)
+        #del local_packages
         # Added these two lines to free up memory
         del local_package
         del local_updater
@@ -166,15 +222,7 @@ def train(config, logger, record, loaded_record):
 
         if verbose: logger.info("kernel computation time {:3f}".format(time.time() - start_time))
         # Returns a function that, given t and f_0, solves for f_t
-        
-        if config.gpu_intensive:
-            predictor = gradient_descent_ce(global_kernel, global_ys, config.lr)
-            # Configure maximum t as one more than the largest tau value
-            t = torch.arange(config.taus[-1]+1, device=config.device)
-        else:
-            predictor = gradient_descent_ce(global_kernel.to("cpu"), global_ys.to("cpu"), config.lr)
-            # Configure maximum t as one more than the largest tau value
-            t = torch.arange(config.taus[-1]+1, device="cpu")
+        predictor = gradient_descent_ce(global_kernel.cpu(), global_ys.cpu(), config.lr)
             
             
         # This is f^(0) (X)
@@ -183,14 +231,11 @@ def train(config, logger, record, loaded_record):
         with torch.no_grad():
             fx_0 = model(global_xs)
 
-        
+        # Configure maximum t as one more than the largest tau value
+        t = torch.arange(config.taus[-1]+1)
 
         # Create f_x using the time values and the initial f_x
-        
-        if config.gpu_intensive:
-            fx_train = predictor(t, fx_0)
-        else: 
-            fx_train = predictor(t, fx_0.to("cpu"))
+        fx_train = predictor(t, fx_0.cpu())
         # fx_train = fx_train.to(fx_0)
 
         # Set the averaged weight as the weight to be evaluated
@@ -202,15 +247,12 @@ def train(config, logger, record, loaded_record):
         for i, tau in enumerate(config.taus):
             # initialize the weight aggregator with current weights
             weight_aggregator = WeightMod(init_state_dict)
-            
-            if config.gpu_intensive:
-                global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
-                        global_ys, fx_train[:tau+1], config.loss, 
-                        model.state_dict())        
-            else:
-                global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
-                        global_ys.to("cpu"), fx_train[:tau+1], config.loss, 
-                        model.state_dict())
+            global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
+                    global_ys.cpu(), fx_train[:tau+1], config.loss, 
+                    model.state_dict())
+            # global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
+            #         global_ys, fx_train[:tau+1], config.loss, 
+            #         model.state_dict())        
             
             # Complete the sum in 9b
             weight_aggregator.add(global_omegas)
@@ -304,8 +346,8 @@ def train(config, logger, record, loaded_record):
             client_accs = []
             client_taus = []
             
-            # If self-training is specified for all rounds, train on own data at the beginning of each round
-            if config.train_on_own_data and config.own_data_all_rounds:
+            # If NTK self-training is specified for all rounds, train on own data at the beginning of each round
+            if config.train_on_own_data and config.own_data_all_rounds and config.self_train == "ntk":
                 print("Training on own data every round")
                 for client_id in user_ids:
                     if verbose: logger.info(f"Client {client_id} training on own data: round {i}")
@@ -314,7 +356,6 @@ def train(config, logger, record, loaded_record):
                     if verbose: logger.info(f"Client {client_id} loss: {loss}, acc: {acc}, tau: {tau}")
                 
             
-
             # Create the graph for this round
             if config.topology == "random":
                 G = create_random_graph(config.users, config.p, config.graph_name)
@@ -337,10 +378,47 @@ def train(config, logger, record, loaded_record):
                     logger.info(f"Clients trained: {clients_trained}")
             # Create 2D array of client losses per round
             logger.info(f"Avg client loss: {np.mean(client_losses)}")
+            print(f"Avg client loss: {np.mean(client_losses)}")
             logger.info(f"Avg client acc: {np.mean(client_accs)}")
-            record["loss"].append(client_losses)
-            record["testing_accuracy"].append(client_accs)
+            
             record["taus"].append(client_taus)
+
+            # If self training with SGD
+            if config.self_train == "sgd":            
+                record["pre_sgd_loss"].append(client_losses)
+                record["pre_sgd_acc"].append(client_accs)
+                # Now perform self training with SGD
+                if config.loss == "ce":
+                    loss_fn_pytorch = nn.CrossEntropyLoss()
+                else: 
+                    raise NotImplementedError
+                
+                for client_id in user_ids:
+                    self_train(model_dict[client_id], client_id, dataset, config, logger, loss_fn_pytorch, 
+                               config.sgd_batch_size, config.sgd_epochs, config.sgd_lr, verbose = config.verbose)
+                
+                # Now, evaluate the models
+                losses = []
+                accs = []
+                for client_id in user_ids:
+                    # Get model outputs
+                    output_on_test_set = model_dict[client_id](test_images)
+
+                    # Get losses/accs, and append to list
+                    loss = loss_with_output(output_on_test_set, test_labels, config.loss)
+                    acc = accuracy_with_output(output_on_test_set, test_labels)
+        
+                    losses.append(loss)
+                    accs.append(acc)
+
+                if verbose or True: print("After SGD update: average loss: {:.4f}, Average acc: {:.4f}".format(np.mean(losses), np.mean(accs)))
+                record["loss"].append(losses)
+                record["testing_accuracy"].append(accs)
+            
+            # If not training with SGD
+            else:
+                record["loss"].append(client_losses)
+                record["testing_accuracy"].append(client_accs)
             # Save Model Dict
             record["models"] = model_dict
             record["epoch"] += 1
@@ -367,10 +445,14 @@ def main(config_file):
     
     if config.device == "cuda":
         torch.backends.cudnn.benchmark = True
-        torch.backends.cudnn.deterministic = True
+        # torch.backends.cudnn.deterministic = True
 
     # Record topology
     record["topology"] = config.topology
+    if config.self_train == "sgd":
+        record["pre_sgd_loss"] = []
+        record["pre_sgd_acc"] = []
+
 
     # All work is done in the train function
     start = time.time()

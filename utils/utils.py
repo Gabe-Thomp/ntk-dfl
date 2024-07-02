@@ -17,7 +17,13 @@ def init_logger(config):
     logger = logging.getLogger()
     logger.setLevel(log_level)
 
-    fh = logging.FileHandler(config.log_file)
+    current_path = os.path.dirname(__file__)
+    current_path = os.path.dirname(current_path)
+    current_path = os.path.dirname(current_path)
+    current_path = os.path.join(current_path, config.log_file)
+    print(current_path)
+    
+    fh = logging.FileHandler(current_path)
     fh.setLevel(log_level)
     sh = logging.StreamHandler()
     sh.setLevel(log_level)

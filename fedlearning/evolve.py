@@ -136,7 +136,7 @@ def load_weights(mod: nn.Module, names: List[str], params: Tuple[Tensor, ...]) -
 	for name, p in zip(names, params):
 		_set_nested_attr(mod, name.split("."), p)
 
-def jacobian(model, x):
+def jacobian(model, x, device="cpu"):
     """
     Args:
 	model: model with vector output (not scalar output!) the parameters of which we want to compute the Jacobian for
@@ -153,14 +153,16 @@ def jacobian(model, x):
         out = model(x)
         return out
     
-    for i, (name, param) in enumerate(zip(all_names, all_params)):
-        jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x, param), param, 
-                                            strict=True if i==0 else False, vectorize=False if i==0 else True)
-        
-        jacs[name] = jac.to("cpu")
-        # jacs[name] = jac
+    
+    with torch.no_grad():
+        for i, (name, param) in enumerate(zip(all_names, all_params)):
+            jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x, param), param, 
+                                                strict=True if i==0 else False, vectorize=False if i==0 else True)
+            
+            jacs[name] = jac.to(device)
+            # jacs[name] = jac
 
-    return jacs
+        return jacs
 
 
 def global_jacobian(model, x):
@@ -191,7 +193,7 @@ def global_jacobian(model, x):
     return global_jacs
 
 
-def combine_local_jacobians(local_packages):
+def combine_local_jacobians(local_packages, device="cpu"):
     global_jacs = OrderedDict()
     num_datapoints = [0]
     w_names = list(local_packages[0].keys())
@@ -208,7 +210,7 @@ def combine_local_jacobians(local_packages):
         shape = local_package[w_name].shape
         shape = torch.tensor(shape)
         shape[0] = sum_num_datapoints
-        global_jacs[w_name] = torch.zeros(shape.tolist())
+        global_jacs[w_name] = torch.zeros(shape.tolist(), device=device)
 
     for i, local_package in enumerate(local_packages):
         for w_name in w_names:

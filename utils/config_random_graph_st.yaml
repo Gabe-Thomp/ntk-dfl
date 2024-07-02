@@ -1,17 +1,18 @@
 # Alpha=0.5 w/ random, time-dependent topology
 # Testing out new hyperparameters for local SGD
-# - 3 epochs
-# - 0.001 learning rate
+# - 5 epochs
+# - 0.005 learning rate
 # - 32 batch size
 
 # device: "cuda" | "cpu"
 device: cuda
 debug: true
+gpu_intensive: true
 
 # distributed networks
 # users:            number of users
-rounds: 30
-users: 300
+rounds: 1
+users: 20
 
 # Selects 20 per round
 part_rate: 1.0 #0.07
@@ -22,11 +23,11 @@ part_rate: 1.0 #0.07
 p: 0.015
 
 
-sgd_epochs: 3
-sgd_lr: 0.001
-sgd_batch_size: 32
+sgd_epochs: 5
+sgd_lr: 0.005
+sgd_batch_size: 16
 
-self_train: sgd
+self_train: "sgd"
 
 topology: "random"
 
@@ -34,7 +35,7 @@ train_on_own_data: false
 own_data_all_rounds: false
 
 graph_name: null
-verbose: false
+verbose: true
 
 record_path: null
 
@@ -64,11 +65,11 @@ test_data_dir:  data/fmnist/test.dat
 # I think user_with_data is the file that contains the user data parsed into non IID segments already
 # This file is alpha0.1 
 
-user_with_data: "data/user_with_data/fmnist300/a0.5/user_dataidx_map_0.50_0.dat"
-iid: false
+# user_with_data: "data/user_with_data/fmnist300/a0.5/user_dataidx_map_0.50_0.dat"
+# iid: false
 
-# user_with_data: ""
-# iid: true
+user_with_data: ""
+iid: true
 
 datapoint_size:
 - 28
@@ -77,9 +78,9 @@ channels: 1
 label_size: 10
 
 # Log and record configurations
-record_dir:  "trial16/{}.dat"
+record_dir:  "trial17/{}.dat"
 log_level:   "INFO"
-log_file:    "../records/trial16/train.log"
+log_file:    "records/trial17/train.log"
 
 model: "mlp"
 full_weight_dir: ""

@@ -5,7 +5,7 @@ import numpy as onp
 def load_config(filename=None):
     """Load configurations of yaml file"""
     current_path = os.path.dirname(__file__)
-
+    print("Creating config from filepath: ", current_path)
     if filename is None:
         filename = "config.yaml"
 
