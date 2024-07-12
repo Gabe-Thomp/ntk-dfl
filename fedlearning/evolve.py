@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 Tensor = torch.Tensor
 from torchdiffeq import odeint
+import time
+from torch.func import jacrev, jacfwd
 
 def gradient_descent_ce(k_train_train, y_train, learning_rate):
     num_datpts = y_train.shape[0]
@@ -136,7 +138,7 @@ def load_weights(mod: nn.Module, names: List[str], params: Tuple[Tensor, ...]) -
 	for name, p in zip(names, params):
 		_set_nested_attr(mod, name.split("."), p)
 
-def jacobian(model, x, device="cpu"):
+def jacobian(model, x, device="cpu", jac_batch_size=None):
     """
     Args:
 	model: model with vector output (not scalar output!) the parameters of which we want to compute the Jacobian for
@@ -156,11 +158,37 @@ def jacobian(model, x, device="cpu"):
     
     with torch.no_grad():
         for i, (name, param) in enumerate(zip(all_names, all_params)):
-            jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x, param), param, 
-                                                strict=True if i==0 else False, vectorize=False if i==0 else True)
+            if jac_batch_size is not None:
+                batch_size = jac_batch_size
+                temp_jacs = []
+                for i in range(0, x.shape[0], batch_size):
+                    # jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x, param), param, 
+                    #                                     strict=True if i==0 else False, vectorize=False if i==0 else True)
+                    temp_jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x[i:i+batch_size], param), param, 
+                                                strict=False, vectorize=True)
+                    temp_jacs.append(temp_jac)
+                
+                temp_jacs = torch.cat(temp_jacs, dim=0)
+
+                jacs[name] = temp_jacs.to(device)
+                # jacs[name] = jac
             
-            jacs[name] = jac.to(device)
-            # jacs[name] = jac
+            else: 
+                    
+                jac = torch.autograd.functional.jacobian(lambda param: param_as_input_func(jac_model, x, param), param, 
+                                                    strict=True if i==0 else False, vectorize=False if i==0 else True)
+                
+                
+                jacs[name] = jac.to(device)
+                # jacs[name] = jac
+
+                # # Try another method
+                
+                # func = lambda param: param_as_input_func(jac_model, x, param)
+                # jac_func = jacrev(func, argnums=0, chunk_size=None)
+                # start_time = time.time()
+                # jac2 = jac_func(param)
+                # print(f"Jac 2 computation time: {time.time()-start_time}")
 
         return jacs
 
@@ -215,7 +243,7 @@ def combine_local_jacobians(local_packages, device="cpu"):
     for i, local_package in enumerate(local_packages):
         for w_name in w_names:
             global_jacs[w_name][num_datapoints[i]:num_datapoints[i+1]] = local_package[w_name]
-
+    
     return global_jacs
 
 def empirical_kernel(jac_mats):

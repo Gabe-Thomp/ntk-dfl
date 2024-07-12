@@ -135,6 +135,7 @@ def train(config, logger, record, loaded_record):
             if global_xs is None:
                 global_xs = local_updater.xs
                 global_ys = local_updater.ys
+            
             else:
                 global_xs = torch.vstack((global_xs, local_updater.xs))
                 global_ys = torch.vstack((global_ys, local_updater.ys))            
@@ -331,7 +332,13 @@ def main(config_file):
     config = load_config(config_file)
     
     logger = init_logger(config)
-    
+    logger.info("Loaded configuration from {}".format(config_file))
+    logger.info("Dataset path: {}".format(config.train_data_dir))
+    if config.user_with_data == "":
+        logger.info("IID Dataset")
+    else:
+        logger.info(f"Using \"{config.user_with_data}\" premade Non-IID dataset")
+
     # Define a model random to extract number of parameters for record
     if config.record_path is not None:
         record = load_record(config.record_path)

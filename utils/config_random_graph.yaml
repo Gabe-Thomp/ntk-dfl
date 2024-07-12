@@ -1,4 +1,5 @@
-# Alpha=0.5 w/ random, time-dependent topology
+# EMNIST
+
 # device: "cuda" | "cpu"
 device: cuda
 debug: true
@@ -46,17 +47,26 @@ taus:
 - 800
 
 # Dataset configurations
-train_data_dir: data/fmnist/train.dat
-test_data_dir:  data/fmnist/test.dat
+# train_data_dir: data/fmnist/train.dat
+# test_data_dir:  data/fmnist/test.dat
 
-# I think user_with_data is the file that contains the user data parsed into non IID segments already
-# This file is alpha0.1 
+# # I think user_with_data is the file that contains the user data parsed into non IID segments already
+# # This file is alpha0.1 
 
-user_with_data: "data/user_with_data/fmnist300/a0.5/user_dataidx_map_0.50_0.dat"
-iid: false
+# user_with_data: "data/user_with_data/fmnist300/a0.5/user_dataidx_map_0.50_0.dat"
+# iid: false
+
 
 # user_with_data: ""
 # iid: true
+
+
+train_data_dir: data/emnist/digits/train.dat
+test_data_dir:  data/emnist/digits/test.dat
+# user_with_data: ""
+
+user_with_data: "data/user_with_data/emnist/digits/user_dataidx_map_0.dat"
+iid : false
 
 datapoint_size:
 - 28
@@ -65,9 +75,9 @@ channels: 1
 label_size: 10
 
 # Log and record configurations
-record_dir:  ../records/trial3/{}.dat
+record_dir:  ../records/trials/trial18/{}.dat
 log_level:   "INFO"
-log_file:    "./train.log"
+log_file:    "records/trials/trial18/train.log"
 
 model: "mlp"
 full_weight_dir: ""

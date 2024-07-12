@@ -44,7 +44,7 @@ class LocalUpdater(object):
             self.xs = torch.from_numpy(user_resource["images"]).to(config.device)
             self.ys = torch.from_numpy(user_resource["labels"]).to(config.device)
             self.label_size = user_resource["labels"].shape[-1]
-
+            self.config = config
         except KeyError:
             logging.error("LocalUpdater initialization failure! Input should include `lr`, `batch_size`!") 
 
@@ -94,7 +94,8 @@ class LocalUpdater(object):
     def local_step(self, model, tau=None, device=None):
         if device is None:
             device = self.device
-        self.jac_mats = jacobian(model, self.xs, device=device)
+        self.jac_mats = jacobian(model, self.xs, device=device, 
+                                 jac_batch_size=self.config.jac_batch_size if hasattr(self.config, "jac_batch_size") else None)
 
     def uplink_transmit(self):
         """Simulate the transmission of local weights to the central server.

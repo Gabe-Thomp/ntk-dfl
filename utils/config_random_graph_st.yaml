@@ -1,18 +1,19 @@
-# Alpha=0.5 w/ random, time-dependent topology
-# Testing out new hyperparameters for local SGD
-# - 5 epochs
-# - 0.005 learning rate
-# - 32 batch size
+# For a trial on IID fashion-mnist with the convolutional NN
 
 # device: "cuda" | "cpu"
 device: cuda
 debug: true
-gpu_intensive: true
+
+
+gpu_intensive: false
+jac_calc_intensive: true
+deq_intensive: true
+ntk_intensive: false
 
 # distributed networks
 # users:            number of users
-rounds: 1
-users: 20
+rounds: 10
+users: 300
 
 # Selects 20 per round
 part_rate: 1.0 #0.07
@@ -24,10 +25,10 @@ p: 0.015
 
 
 sgd_epochs: 5
-sgd_lr: 0.005
-sgd_batch_size: 16
+sgd_lr: 0.001
+sgd_batch_size: 64
 
-self_train: "sgd"
+self_train: null
 
 topology: "random"
 
@@ -39,10 +40,16 @@ verbose: true
 
 record_path: null
 
-lr: 0.01
+lr: 0.005
 # Hard coded based on training data set size. For example, 60000 fashion mnist images/300 users = 200 batch size
 # I think this only applies to 
+
 local_batch_size: 200
+
+
+# Things that should make larger models work
+jac_batch_size: 50
+
 
 # Whether or not weights should be initialized to the same value for each client originally
 same_init: true
@@ -52,9 +59,7 @@ loss: "ce"
 taus:
 - 100
 - 200
-- 300 
 - 400
-- 500
 - 600
 - 800
 
@@ -68,8 +73,14 @@ test_data_dir:  data/fmnist/test.dat
 # user_with_data: "data/user_with_data/fmnist300/a0.5/user_dataidx_map_0.50_0.dat"
 # iid: false
 
+
+# train_data_dir: data/mnist/train.dat
+# test_data_dir:  data/mnist/test.dat
 user_with_data: ""
 iid: true
+
+# user_with_data: "data/user_with_data/mnist300/a0.1/user_dataidx_map_0.10_0.dat"
+# iid: false
 
 datapoint_size:
 - 28
@@ -78,10 +89,10 @@ channels: 1
 label_size: 10
 
 # Log and record configurations
-record_dir:  "trial17/{}.dat"
+record_dir:  "../records/trials/trial22/{}.dat"
 log_level:   "INFO"
-log_file:    "records/trial17/train.log"
+log_file:    "records/trials/trial22/train.log"
 
-model: "mlp"
+model: "cnn"
 full_weight_dir: ""
 

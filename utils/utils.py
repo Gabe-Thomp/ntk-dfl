@@ -9,6 +9,15 @@ import torch
 from fedlearning.model import init_weights
 from fedlearning import nn_registry
 
+def tensor_size_in_bytes(tensor):
+    return tensor.nelement() * tensor.element_size()
+
+def jac_size_in_bytes(package):
+    size = 0.0
+    for key in package.keys():
+        size += tensor_size_in_bytes(package[key])
+    return size
+
 def init_logger(config):
     """Initialize a logger object. 
     """

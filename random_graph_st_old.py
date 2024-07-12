@@ -292,9 +292,6 @@ def train(config, logger, record, loaded_record):
         model_dict[client_id].load_state_dict(params)
 
         # Return the current loss, accuracy, and tau
-        # record["loss"].append(current_loss)
-        # record["testing_accuracy"].append(current_acc)
-        # record["taus"].append(current_tau)
         torch.cuda.empty_cache()
         return current_loss, current_acc, current_tau
 
@@ -378,7 +375,6 @@ def train(config, logger, record, loaded_record):
                     logger.info(f"Clients trained: {clients_trained}")
             # Create 2D array of client losses per round
             logger.info(f"Avg client loss: {np.mean(client_losses)}")
-            print(f"Avg client loss: {np.mean(client_losses)}")
             logger.info(f"Avg client acc: {np.mean(client_accs)}")
             
             record["taus"].append(client_taus)
@@ -411,7 +407,7 @@ def train(config, logger, record, loaded_record):
                     losses.append(loss)
                     accs.append(acc)
 
-                if verbose or True: print("After SGD update: average loss: {:.4f}, Average acc: {:.4f}".format(np.mean(losses), np.mean(accs)))
+                if verbose: print("After SGD update: average loss: {:.4f}, Average acc: {:.4f}".format(np.mean(losses), np.mean(accs)))
                 record["loss"].append(losses)
                 record["testing_accuracy"].append(accs)
             
