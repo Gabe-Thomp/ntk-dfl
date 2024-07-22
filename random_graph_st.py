@@ -169,162 +169,178 @@ def train(config, logger, record, loaded_record):
         else:
             model_dict = {model_id: init_model(config, logger) for model_id in user_ids}
     
-    def train_client(client_id, neighbors, model_dict, record, config, dataset, verbose=False):
-        acc = []
-        losses = []
-        params_list = []
-
-        global_kernel = None
-        global_xs = None
-        global_ys = None
-        local_packages = []
-        local_kernels = []
-
-        # Refers to the "global" jac for this client
-        global_jac = None
-
+    def train_client(client_id, neighbors, model_dict, record, config, dataset, verbose=False, lr=None):
+        
+        # Set up learning rate
+        if lr is None:
+            lr = config.lr
+    
         averaged_weight = average_neighbor_weights(client_id, neighbors, model_dict)
         # Load aggregated weights into neighbors to evaluate jacobians, f(x), and store for later reloading
         old_neighbor_weights = load_and_deload_neighbor_weights(neighbors, model_dict, averaged_weight)
         # Load weight into client as well
         model_dict[client_id].load_state_dict(averaged_weight)
-
+        
         # Aggregate jacobians, x, y for each neighbor to simulate sending to current client
         # (Though in the implementation, we would send f(x) rather than x, we append x here for simplicity)
         # the +[client_id] is to include the client itself
-        for user_id in neighbors+[client_id]:
-            # Select the model with which to take jacobian
-            model = model_dict[user_id]
+        
+        # Get the current model parameters. This is what clients will take the jacobian with respect to.
+        model_for_round = copy.deepcopy(model_dict[client_id])
+        
+        for batch_round in range(config.batch_m):
+            acc = []
+            losses = []
+            params_list = []
 
-            if verbose: logger.info("user {:d} sending jacobian".format(user_id))
-            # assign_user_resource specifies some parameters for the user given their user_id
-            # user_resource is a dictionary with keys: lr, device, batch_size, images, labels
-            user_resource = assign_user_resource(config, user_id, 
-                                    dataset["train_data"], dataset["user_with_data"])
-            local_updater = LocalUpdater(config, user_resource)
+            global_kernel = None
+            global_xs = None
+            global_ys = None
+            local_packages = []
+            local_kernels = []
+
+            # Refers to the "global" jac for this client
+            global_jac = None
             
+            for user_id in neighbors+[client_id]:
+                # Select the model with which to take jacobian
+                model = model_dict[user_id]
+
+                if verbose: logger.info("user {:d} sending jacobian".format(user_id))
+                # assign_user_resource specifies some parameters for the user given their user_id
+                # user_resource is a dictionary with keys: lr, device, batch_size, images, labels
+                user_resource = assign_user_resource(config, user_id, 
+                                        dataset["train_data"], dataset["user_with_data"])
+                
+                # Restrict available data for Jacobians to the current batch
+                user_resource["images"] = user_resource["images"][batch_round * config.local_batch_size//config.batch_m: (batch_round+1) * config.local_batch_size//config.batch_m]
+                user_resource["labels"] = user_resource["labels"][batch_round * config.local_batch_size//config.batch_m: (batch_round+1) * config.local_batch_size//config.batch_m]
+                user_resource["batch_size"] = config.local_batch_size//config.batch_m
+                # print("Using batch size: ", user_resource["batch_size"], "from", batch_round * config.local_batch_size//config.batch_m, "to", (batch_round+1) * config.local_batch_size//config.batch_m)
             
-            # Gets the local jacobians for a given client specified in local_updater
-            if config.gpu_intensive or config.jac_calc_intensive:
-                local_updater.local_step(model, device=config.device)
+                local_updater = LocalUpdater(config, user_resource)
+                
+                # Gets the local jacobians for a given client specified in local_updater
+                if config.gpu_intensive or config.jac_calc_intensive:
+                    local_updater.local_step(model_for_round, device=config.device)
+                else:
+                    local_updater.local_step(model_for_round, device="cpu")
+                # Simulate uplink transmission
+                local_package = local_updater.uplink_transmit()
+                # Append this clients jacobians to the list
+                local_packages.append(local_package)
+
+                # Send local x and y
+                if global_xs is None:
+                    global_xs = local_updater.xs
+                    global_ys = local_updater.ys
+                else:
+                    global_xs = torch.vstack((global_xs, local_updater.xs))
+                    global_ys = torch.vstack((global_ys, local_updater.ys))            
+
+                # del local_updater
+                torch.cuda.empty_cache()
+            reload_neighbor_weights(neighbors, model_dict, old_neighbor_weights)
+
+            # Affirm that the model is the clients model
+            model = model_dict[client_id]
+
+            start_time = time.time()
+            if config.gpu_intensive or config.ntk_intensive:
+                global_jac = combine_local_jacobians(local_packages, device=config.device)
             else:
-                local_updater.local_step(model, device="cpu")
-            # Simulate uplink transmission
-            local_package = local_updater.uplink_transmit()
-            # Append this clients jacobians to the list
-            local_packages.append(local_package)
-
-            # Send local x and y
-            if global_xs is None:
-                global_xs = local_updater.xs
-                global_ys = local_updater.ys
-            else:
-                global_xs = torch.vstack((global_xs, local_updater.xs))
-                global_ys = torch.vstack((global_ys, local_updater.ys))            
-
-            # del local_updater
-            torch.cuda.empty_cache()
-        reload_neighbor_weights(neighbors, model_dict, old_neighbor_weights)
-
-        # Affirm that the model is the clients model
-        model = model_dict[client_id]
-
-        start_time = time.time()
-        if config.gpu_intensive or config.ntk_intensive:
-            global_jac = combine_local_jacobians(local_packages, device=config.device)
-        else:
-            global_jac = combine_local_jacobians(local_packages, device="cpu")
-        
-        del local_packages
-        # Added these two lines to free up memory
-        del local_package
-        del local_updater
-        if verbose: logger.info("compute kernel matrix")
-        global_kernel = empirical_kernel(global_jac)
-
-        if verbose: logger.info("kernel computation time {:3f}".format(time.time() - start_time))
-        # Returns a function that, given t and f_0, solves for f_t
-        
-        if config.gpu_intensive or config.deq_intensive:
-            predictor = gradient_descent_ce(global_kernel, global_ys, config.lr)
-            # Configure maximum t as one more than the largest tau value
-            t = torch.arange(config.taus[-1]+1, device=config.device)
-        else:
-            predictor = gradient_descent_ce(global_kernel.to("cpu"), global_ys.to("cpu"), config.lr)
-            # Configure maximum t as one more than the largest tau value
-            t = torch.arange(config.taus[-1]+1, device="cpu")
+                global_jac = combine_local_jacobians(local_packages, device="cpu")
             
-            
-        # This is f^(0) (X)
-        # Note: The model var still has the aggregated weight, so it can be used to evaluate the model
-        # and find f0. However, in the distributed implementation, we would send the model to the client
-        with torch.no_grad():
-            fx_0 = model(global_xs)
+            del local_packages
+            # Added these two lines to free up memory
+            del local_package
+            del local_updater
+            if verbose: logger.info("compute kernel matrix")
+            global_kernel = empirical_kernel(global_jac)
 
-        
-
-        # Create f_x using the time values and the initial f_x
-        if config.gpu_intensive or config.deq_intensive:
-            fx_train = predictor(t, fx_0)
-        else: 
-            fx_train = predictor(t, fx_0.to("cpu"))
-        # fx_train = fx_train.to(fx_0)
-
-        # Set the averaged weight as the weight to be evaluated
-        init_state_dict = averaged_weight
-        losses = np.zeros_like(taus, dtype=float)
-        acc = np.zeros_like(taus, dtype=float)
-
-        if verbose: logger.info("time\tloss \tacc")
-        for i, tau in enumerate(config.taus):
-            # initialize the weight aggregator with current weights
-            weight_aggregator = WeightMod(init_state_dict)
+            if verbose: logger.info("kernel computation time {:3f}".format(time.time() - start_time))
+            # Returns a function that, given t and f_0, solves for f_t
             
             if config.gpu_intensive or config.deq_intensive:
-                global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
-                        global_ys, fx_train[:tau+1], config.loss, 
-                        model.state_dict())        
+                predictor = gradient_descent_ce(global_kernel, global_ys, lr)
+                # Configure maximum t as one more than the largest tau value
+                t = torch.arange(config.taus[-1]+1, device=config.device)
             else:
-                global_omegas = get_omegas(t[:tau+1], config.lr, global_jac, 
-                        global_ys.to("cpu"), fx_train[:tau+1], config.loss, 
-                        model.state_dict())
+                predictor = gradient_descent_ce(global_kernel.to("cpu"), global_ys.to("cpu"), lr)
+                # Configure maximum t as one more than the largest tau value
+                t = torch.arange(config.taus[-1]+1, device="cpu")
+                
+                
+            # This is f^(0) (X)
+            # Note: The model var still has the aggregated weight, so it can be used to evaluate the model
+            # and find f0. However, in the distributed implementation, we would send the model to the client
+            with torch.no_grad():
+                fx_0 = model(global_xs)
+
             
-            # Complete the sum in 9b
-            weight_aggregator.add(global_omegas)
-            aggregated_weight = weight_aggregator.state_dict()
-            model.load_state_dict(aggregated_weight)
 
-            output = model(global_xs)    
+            # Create f_x using the time values and the initial f_x
+            if config.gpu_intensive or config.deq_intensive:
+                fx_train = predictor(t, fx_0)
+            else: 
+                fx_train = predictor(t, fx_0.to("cpu"))
+            # fx_train = fx_train.to(fx_0)
 
-            loss = loss_with_output(output, global_ys, config.loss)
-            # loss_fx = loss_with_output(fx_train[tau].to(global_ys), global_ys, config.loss)
-            losses[i] = loss
+            # Set the averaged weight as the weight to be evaluated
+            init_state_dict = averaged_weight
+            losses = np.zeros_like(taus, dtype=float)
+            acc = np.zeros_like(taus, dtype=float)
 
-            output = model(test_images)
+            if verbose: logger.info("time\tloss \tacc")
+            for i, tau in enumerate(config.taus):
+                # initialize the weight aggregator with current weights
+                weight_aggregator = WeightMod(init_state_dict)
+                
+                if config.gpu_intensive or config.deq_intensive:
+                    global_omegas = get_omegas(t[:tau+1], lr, global_jac, 
+                            global_ys, fx_train[:tau+1], config.loss, 
+                            model.state_dict())        
+                else:
+                    global_omegas = get_omegas(t[:tau+1], lr, global_jac, 
+                            global_ys.to("cpu"), fx_train[:tau+1], config.loss, 
+                            model.state_dict())
+                
+                # Complete the sum in 9b
+                weight_aggregator.add(global_omegas)
+                aggregated_weight = weight_aggregator.state_dict()
+                model.load_state_dict(aggregated_weight)
 
-            test_acc = accuracy_with_output(output, test_labels)
-            acc[i] = test_acc
+                output = model(global_xs)    
 
-            if verbose: logger.info("{:.0f}\t{:.3f}\t{:.3f}".format(tau, loss, test_acc))
+                loss = loss_with_output(output, global_ys, config.loss)
+                # loss_fx = loss_with_output(fx_train[tau].to(global_ys), global_ys, config.loss)
+                losses[i] = loss
 
-            params_list.append(copy.deepcopy(aggregated_weight))
+                output = model(test_images)
 
-        # Get index of tau with lowest loss
-        idx = np.argmin(losses)
-        # Select weight parameters with lowest loss
-        params = params_list[idx]
+                test_acc = accuracy_with_output(output, test_labels)
+                acc[i] = test_acc
 
-        # Select tau with lowest loss
-        current_tau = taus[idx]
-        current_acc = acc[idx]
-        current_loss = losses[idx]
+                if verbose: logger.info("{:.0f}\t{:.3f}\t{:.3f}".format(tau, loss, test_acc))
 
-        if verbose: logger.info("current tau {:d}".format(current_tau))
-        if verbose: logger.info("acc {:4f}".format(current_acc))
-        if verbose: logger.info("loss {:.4f}".format(current_loss))
+                params_list.append(copy.deepcopy(aggregated_weight))
 
-        # Load weight into client model
-        model_dict[client_id].load_state_dict(params)
+            # Get index of tau with lowest loss
+            idx = np.argmin(losses)
+            # Select weight parameters with lowest loss
+            params = params_list[idx]
+
+            # Select tau with lowest loss
+            current_tau = taus[idx]
+            current_acc = acc[idx]
+            current_loss = losses[idx]
+
+            if verbose: logger.info("current tau {:d}".format(current_tau))
+            if verbose: logger.info("acc {:4f}".format(current_acc))
+            if verbose: logger.info("loss {:.4f}".format(current_loss))
+
+            # Load weight into client model
+            model_dict[client_id].load_state_dict(params)
 
         # Return the current loss, accuracy, and tau
         torch.cuda.empty_cache()
@@ -373,7 +389,7 @@ def train(config, logger, record, loaded_record):
             for client_id in user_ids:
                 if verbose: logger.info(f"Client {client_id} training on own data")
                 # [] for no neighbors
-                loss, acc, tau = train_client(client_id, [], model_dict, record, config, dataset, verbose=verbose)
+                loss, acc, tau = train_client(client_id, [], model_dict, record, config, dataset, verbose=verbose, lr = config.lr)
                 if verbose: logger.info(f"Client {client_id} loss: {loss}, acc: {acc}, tau: {tau}")
             
         
@@ -383,6 +399,16 @@ def train(config, logger, record, loaded_record):
             client_accs = []
             client_taus = []
             
+            # Configure lr with exponential decay
+            if config.lr_end is not None:
+                a = -config.rounds/np.log(config.lr_end/config.lr)
+                lr = config.lr * np.exp(-i / a)
+                if verbose: logger.info(f"Learning rate: {lr}")
+            else: 
+                lr = config.lr
+                if verbose: logger.info(f"Learning rate: {lr}")
+            
+
             # If self-training is specified for all rounds, train on own data at the beginning of each round
             if config.train_on_own_data and config.own_data_all_rounds:
                 print("Training on own data every round")
@@ -408,7 +434,7 @@ def train(config, logger, record, loaded_record):
             for client_id in user_ids:
                 neighbors = list(G.neighbors(client_id))
                 if verbose: logger.info(f"Num neighbors: {len(neighbors)}")
-                loss, acc, tau = train_client(client_id, neighbors, model_dict, record, config, dataset, verbose=verbose)
+                loss, acc, tau = train_client(client_id, neighbors, model_dict, record, config, dataset, verbose=verbose, lr=lr)
                 client_losses.append(loss)
                 client_accs.append(acc)
                 client_taus.append(tau)

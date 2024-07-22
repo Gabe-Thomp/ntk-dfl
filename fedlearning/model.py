@@ -59,10 +59,10 @@ class NaiveCNN(nn.Module):
         self.in_dims = in_dims
         self.out_dims = out_dims
         super(NaiveCNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=3, stride=1, padding="same")
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, stride=1, padding="same")
+        self.conv1 = nn.Conv2d(in_channels, 32, kernel_size=3, stride=1, padding="same")
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding="same")
         # For example, for a 28x28 image, the input to the fc1 will be 64*7*7
-        self.fc1 = nn.Linear(32*in_dims[0]*in_dims[1]//16, 100)
+        self.fc1 = nn.Linear(64*in_dims[0]*in_dims[1]//16, 100)
         self.fc2 = nn.Linear(100, out_dims)
     
     def forward(self, x):
