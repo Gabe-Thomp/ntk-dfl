@@ -8,6 +8,8 @@ import torch
 
 from fedlearning.model import init_weights
 from fedlearning import nn_registry
+from fedlearning.evolve import WeightMod
+import copy
 
 def tensor_size_in_bytes(tensor):
     return tensor.nelement() * tensor.element_size()
@@ -26,11 +28,11 @@ def init_logger(config):
     logger = logging.getLogger()
     logger.setLevel(log_level)
 
-    current_path = os.path.dirname(__file__)
-    current_path = os.path.dirname(current_path)
-    current_path = os.path.dirname(current_path)
-    current_path = os.path.join(current_path, config.log_file)
-    print(current_path)
+    # current_path = os.path.dirname(__file__)
+    # current_path = os.path.dirname(current_path)
+    # current_path = os.path.dirname(current_path)
+    # current_path = os.path.join(current_path, config.log_file)
+    current_path = config.log_file
     
     fh = logging.FileHandler(current_path)
     fh.setLevel(log_level)
@@ -83,15 +85,20 @@ def load_record(filepath):
 #         pickle.dump(record, fp)
 
 def save_record(config, record):
-    current_path = os.path.dirname(__file__)
-    current_path = os.path.dirname(current_path)
-    current_time = datetime.datetime.now()
-    current_time_str = datetime.datetime.strftime(current_time ,r'%d_%m_%H_%M')
-    file_name = config.record_dir.format(current_time_str)
-    parent_path = os.path.dirname(current_path)
-    record_dir = os.path.join(parent_path, "records")
-    os.makedirs(record_dir, exist_ok=True)
-    file_path = os.path.join(record_dir, file_name)
+    if os.path.isabs(config.record_dir):
+        current_time = datetime.datetime.now()
+        current_time_str = datetime.datetime.strftime(current_time ,r'%d_%m_%H_%M')
+        file_path = config.record_dir.format(current_time_str)
+    else:
+        current_path = os.path.dirname(__file__)
+        current_path = os.path.dirname(current_path)
+        current_time = datetime.datetime.now()
+        current_time_str = datetime.datetime.strftime(current_time ,r'%d_%m_%H_%M')
+        file_name = config.record_dir.format(current_time_str)
+        # parent_path = os.path.dirname(current_path)
+        # record_dir = os.path.join(current_path, "records")
+        os.makedirs(current_path, exist_ok=True)
+        file_path = os.path.join(current_path, file_name)
     with open(file_path, "wb") as fp:
         pickle.dump(record, fp)
 
@@ -136,3 +143,13 @@ def init_model(config, logger):
     full_model.to(config.device)
 
     return full_model
+
+def average_neighbor_weights(client_id, neighbor_ids, model_dict):
+    # Average the weights of the models in the cluster
+    weight_dict = copy.deepcopy(model_dict[client_id].state_dict())
+    weight_aggregator = WeightMod(weight_dict)
+    for user_id in neighbor_ids:
+        weight_aggregator.add(copy.deepcopy(model_dict[user_id].state_dict()))
+    # Add one for the client itself
+    weight_aggregator.mul(1.0/ (len(neighbor_ids)+1) )
+    return weight_aggregator.state_dict()

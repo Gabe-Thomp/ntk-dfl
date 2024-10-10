@@ -1,0 +1,87 @@
+debug: true
+device: cuda
+
+comm_round: 30
+rounds: 30
+users: 300
+client_num_in_total: 300
+
+# DisPFL hyperparameters
+epochs: 10
+lr: 0.1  # Updated as per shell script
+lr_decay: 0.998
+frac: 0.01666666 # Updated as per shell script
+batch_size: 10
+
+# Training parameters
+momentum: 0
+local_batch_size: 200
+loss: "ce"
+
+# Dataset configurations
+dataset: 'fmnist'  # Added from shell script
+# train_data_dir: ../../../data/fmnist/train.dat
+# test_data_dir:../../../data/fmnist/test.dat
+
+# train_data_dir: ../../../data/mnist/train.dat
+# test_data_dir: ../../../data/mnist/test.dat
+
+
+train_data_dir: ../../../data/emnist/digits/train.dat
+test_data_dir: ../../../data/emnist/digits/test.dat
+
+# user_with_data: ""
+# iid: true
+
+user_with_data: "../../../data/user_with_data/emnist/digits/user_dataidx_map_0.dat"
+iid: false
+
+
+datapoint_size:
+- 28
+- 28
+channels: 1
+label_size: 10
+
+# Log and record configurations
+record_dir: "./records/{}.dat"
+log_level: "INFO"
+log_file: "./records/train.log"
+model: "mlp"  # Updated as per shell script
+full_weight_dir: ""
+
+# DisPFL parameters
+# Set to the data folder under DisPFL
+data_dir: '../../notebooks/baselines/dispfl/DisPFL/data/'
+partition_method: 'dir'
+partition_alpha: 0.3  # Added from shell script
+client_optimizer: 'sgd'
+wd: 5.0e-4
+frequency_of_the_test: 1
+
+# Hardware
+gpu: 0
+
+# Experiment settings
+ci: 0
+dense_ratio: 0.5
+anneal_factor: 0.5
+seed: 2022  # Updated as per shell script
+cs: 'random'  # Updated as per shell script
+active: 1.0
+public_portion: 0
+erk_power_scale: 1
+
+# Flags
+dis_gradient_check: true  # Updated as per shell script
+strict_avg: false
+static: false
+uniform: false
+save_masks: false
+different_initial: false  # Updated as per shell script
+record_mask_diff: false
+diff_spa: false
+global_test: false
+
+# Additional settings
+tag: 'test'

@@ -52,7 +52,9 @@ def accuracy_with_output(output, labels):
 def loss_with_output(output, labels, loss_type):
     if loss_type == "ce":
         label_size = labels.shape[1]
-        criterion = lambda fx, y: -label_size*torch.mean(torch.log(torch.softmax(fx, dim=1))*y)
+        # This naive implementation is not numerically stable
+        # criterion = lambda fx, y: -label_size*torch.mean(torch.log(torch.softmax(fx, dim=1))*y)
+        criterion = nn.CrossEntropyLoss()
     elif loss_type == "mse":
         criterion =  lambda yhat, y: 0.5*torch.mean((yhat - y)**2) 
     else:

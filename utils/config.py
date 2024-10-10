@@ -5,12 +5,16 @@ import numpy as onp
 def load_config(filename=None):
     """Load configurations of yaml file"""
     current_path = os.path.dirname(__file__)
-    print("Creating config from filepath: ", current_path)
     if filename is None:
-        filename = "config.yaml"
-
-    with open(os.path.join(current_path, filename), "r") as fp:
-        config = yaml.load(fp, Loader=yaml.FullLoader)
+        raise ValueError("No filename provided")
+        #filename = "config.yaml"
+    print("Creating config from filepath: ", filename)
+    if os.path.isabs(filename):
+        with open(filename, "r") as fp:
+            config = yaml.load(fp, Loader=yaml.FullLoader)
+    else: 
+        with open(os.path.join(current_path, filename), "r") as fp:
+            config = yaml.load(fp, Loader=yaml.FullLoader)
 
     # Empty class for yaml loading
     class cfg: pass

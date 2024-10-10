@@ -12,9 +12,38 @@ from torchdiffeq import odeint
 import time
 from torch.func import jacrev, jacfwd
 
+# Average the weights of the models in the set client_id + neighbor_ids
+def average_neighbor_weights(client_id, neighbor_ids, model_dict):
+    # Begin with client weights
+    weight_dict = copy.deepcopy(model_dict[client_id].state_dict())
+    weight_aggregator = WeightMod(weight_dict)
+    # Add the weights of the neighbors
+    for user_id in neighbor_ids:
+        weight_aggregator.add(copy.deepcopy(model_dict[user_id].state_dict()))
+    # Add one for the client itself, normalize by number of neighbors + 1
+    weight_aggregator.mul(1.0/ (len(neighbor_ids)+1) )
+    return weight_aggregator.state_dict()
+
+# Load avg_weight_dict into each neighboring client, specified by neighbor_ids and stored in model_dict
+# Return the old weights of the neighbors for later restoration
+def load_and_deload_neighbor_weights(neighbor_ids, model_dict, avg_weight_dict):
+    # Save the weights of the neighbors
+    older_weight_dicts = [copy.deepcopy(model_dict[user_id].state_dict()) for user_id in neighbor_ids]
+    # Load the average weights
+    for user_id in neighbor_ids:
+        model_dict[user_id].load_state_dict(avg_weight_dict)
+    return older_weight_dicts
+
+# Reload the old weights of the neighbors given the old_weight_dicts, model_dict, and neighbor_ids
+# Note: old_weight_dicts is a list of dictionaries, one for each neighbor. This is obtained directly from
+# load_and_deload_neighbor_weights above. The neighbor_ids must be in the same order as the old_weight_dicts
+def reload_neighbor_weights(neighbor_ids, model_dict, old_weight_dicts):
+    for i, user_id in enumerate(neighbor_ids):
+        model_dict[user_id].load_state_dict(old_weight_dicts[i])
+
 def gradient_descent_ce(k_train_train, y_train, learning_rate):
     num_datpts = y_train.shape[0]
-    # This is the right side of the ODE in equation (5), with the residual being replaced by the cross-entropy loss.
+    # This is the right side of the ODE in equation (5) in NTK-FL, with the residual being replaced by the cross-entropy loss.
     odf_fn = lambda t, fx: -1/num_datpts*k_train_train @ (torch.softmax(fx, dim=-1)-y_train)
     
     def pred_fn(t, f_0): 
@@ -319,7 +348,7 @@ class WeightMod(object):
     def mul(self, rhs):
         for w_name, w_value in self._weight_dict.items():
             self._weight_dict[w_name].data *= rhs
-    
+            
     def div(self, rhs):
         for i, w_name in enumerate(self._weight_dict):
             self._weight_dict[w_name].data /= rhs

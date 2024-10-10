@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.utils import parse_dataset_type
 import numpy as np
 import pickle
@@ -78,14 +81,21 @@ def assign_user_data(config, logger):
 
     if os.path.exists(config.user_with_data):
         logger.info("Non-IID data distribution")
+        logger.info("Load user_with_data from {}".format(config.user_with_data))
         with open(config.user_with_data, "rb") as fp:
             user_with_data = pickle.load(fp)
-    else:
+    
+    elif config.user_with_data == "":
+        logger.info("IID data distribution")
+        logger.info("Generate user_with_data by partitioning dataset by local_batch_size")
         user_with_data = {}
         base = 0
         for usr_id in range(config.users):
             user_with_data[usr_id] = np.arange(base, base+config.local_batch_size)
             base += config.local_batch_size
+
+    else: 
+        raise ValueError("Invalid user_with_data path")
 
     return dict(train_data=train_data,
                 test_data=test_data,

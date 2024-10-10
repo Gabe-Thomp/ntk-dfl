@@ -1,0 +1,76 @@
+# device: "cuda" | "cpu"
+device: cuda
+debug: true
+
+
+# users:         
+rounds: 30
+users: 300
+
+# DFedAvgM hyperparameters
+# Like client fraction C in FedAvg. Needs to be 1 for decentralized methods
+part_rate: 1
+# E in FedAvg
+local_update_steps: 1
+lr: 0.1
+sgd_batch_size: 10
+# Momentum is set to 0 for dpsgd
+momentum: 0
+verbose: false
+
+record_path:
+
+topology: "regular"
+static: false
+
+graph_name:
+p:
+d: 10
+
+# Number of datapoints per user
+local_batch_size: 200
+
+# Whether or not weights should be initialized to the same value for each client originally
+same_init: true
+
+loss: "ce"
+
+# Dataset configurations
+# train_data_dir: ../../../data/fmnist/train.dat
+# test_data_dir: ../../../data/fmnist/test.dat
+
+# For IID data
+# user_with_data: ""
+# iid: true
+
+# user_with_data is the file that contains the user data parsed into non IID segments already
+
+# This file is alpha0.1
+# user_with_data: ""
+# iid: false
+
+# # MNIST
+# train_data_dir: ../../../data/mnist/train.dat
+# test_data_dir: ../../../data/mnist/test.dat
+
+train_data_dir: /home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/emnist/digits/train.dat
+test_data_dir: /home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/emnist/digits/test.dat
+
+
+user_with_data: "/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/emnist/digits/user_dataidx_map_0.dat"
+iid: false
+
+datapoint_size:
+- 28
+- 28
+channels: 1
+label_size: 10
+
+# Log and record configurations
+record_dir: "/home/gathomp3/Deep_Learning/NeuralTangent/records/baseline_trials/dpsgd/trial8/{}.dat"
+log_level: "INFO"
+log_file: "../../records/baseline_trials/dpsgd/trial8/train.log"
+
+model: "mlp"
+full_weight_dir: ""
+

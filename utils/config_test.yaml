@@ -1,0 +1,115 @@
+
+# device: "cuda" | "cpu"
+device: cuda
+debug: true
+
+
+# Number of communication rounds
+rounds: 1
+# Number of clients
+users: 30
+
+# Selects the number of participating clients per round. For DFL setups, this is typically 1.0
+part_rate: 1.0
+
+# Select p for Erdos-Renyi graph
+# users*p is the mean number of edges per node
+# Set to null here because I am using a k-regular graph
+p: null
+d: 2
+
+# Specifies the topology
+# If topology is "regular", then the graph is a d-regular graph. Must include a value for d and set p to null. 
+#    0 <= d < users specifies the degree of each node in the graph
+# If topology is "random", then the graph is an Erdos-Renyi graph. Must include a value for p and set d to null. 
+#    0<=p<=1 specifies the probability of an edge between any two nodes
+# if topology is "ring", then the graph is a ring graph. d and p must be set to null
+topology: "regular"
+
+# train_on_own_data: false
+# own_data_all_rounds: false
+
+graph_name: null
+verbose: false
+
+# Use to continue training from a previous checkpoint .dat file
+record_path: null
+
+lr: 0.01
+lr_decay: 0.07
+
+# Based training data set size. For example, 60000 fashion mnist images/300 users = 200 batch size
+# Not relevant for prepartioned user_with_data datasets
+local_batch_size: 200
+
+
+# Used to toggle GPU usage for the model
+# gpu_intensive: overrides all other intensive flags. Uses GPU for all non-trivial computations
+gpu_intensive: true
+# jac_calc_intensive: Uses GPU for Jacobian calculations
+jac_calc_intensive: false
+# deq_intensive: Uses GPU for DEQ calculations in evolving client residuals and weights
+deq_intensive: false
+# ntk_intensive: Uses GPU for NTK weight evolution
+ntk_intensive: true
+
+# Useful for memory management. Does not impact actual training.
+# jac_batch_size: sets the number of jacobians to be computed in parallel per client. 
+# e.g. if jac_batch_size = 50 and local_batch_size = 200, then 50 jacobians will be computed in parallel 4 times for the 200 local datapoints on each client
+jac_batch_size: 50
+
+# Whether or not client weights should be initialized to the same (random) value at the beginning of training. 
+same_init: true
+
+loss: "ce"
+
+# Times to search over when evolving weights
+taus:
+# - 25 
+# - 50
+- 100
+# - 200
+# - 300
+# - 400
+# - 500
+# - 600
+# - 800
+# - 1000
+
+# Dataset configurations
+train_data_dir: data/fmnist/train.dat
+test_data_dir:  data/fmnist/test.dat
+
+# Leave user_with_data as an empty string if you want an IID partition
+# Include prepartitioned user_with_data paths if you want a non-IID partition
+
+user_with_data: "data/user_with_data/fmnist300/a0.1/user_dataidx_map_0.10_0.dat"
+iid: false
+
+
+# train_data_dir: data/mnist/train.dat
+# test_data_dir:  data/mnist/test.dat
+
+# user_with_data: ""
+# iid: true
+
+# user_with_data: "data/user_with_data/mnist300/a0.5/user_dataidx_map_0.50_0.dat"
+# iid: false
+
+# user_with_data: "data/user_with_data/emnist/digits/user_dataidx_map_0.dat"
+# iid: false
+
+datapoint_size:
+- 28
+- 28
+channels: 1
+label_size: 10
+
+# Log and record configurations
+record_dir:  "./records/{}.dat"
+log_level:   "INFO"
+log_file:    "./records/train.log"
+
+model: "mlp"
+full_weight_dir: ""
+
