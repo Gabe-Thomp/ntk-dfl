@@ -26,7 +26,7 @@ Run the example using IID Fashion-Mnist:
 ```bash
 python3 main.py config.yaml
 ```
-This will load the config file `config.yaml` and data from `data/fmnist/...`, specified in the config file under `train_data_dir` and `test_data_dir`. Training with the NTK-DFL with the specified setup will be performed. A record and train log will be stored in the specifed directory, defaulting to `results/`.
+This will load the config file `utils/config.yaml` and data from `data/fmnist/...`, specified in the config file under `train_data_dir` and `test_data_dir`. Training with the NTK-DFL with the specified setup will be performed. A record and train log will be stored in the specifed directory, defaulting to `results/`.
 
 By modifying the `train_data_dir` and `test_data_dir` paths, you can change the dataset that you want to use. Non-IID partitions have been generated and stored in the `user_with_data` files. Specify the path to the desired partition in the `config.yaml` file under `user_data_dir` in order to select your non-IID partition.
 
