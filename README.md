@@ -1,6 +1,6 @@
 ## NTK-DFL: Enhancing Decentralized Federated Learning in Heterogeneous Settings via Neural Tangent Kernel
 
-**Update:** 🙌 Happy to announce that we were accepted to ICML 2025 🙌! Check out the manuscript [here](https://arxiv.org/abs/2410.01922) for more details.
+**Update:** 🙌 Happy to announce that we were accepted to ICML 2025!🙌 Check out the manuscript [here](https://arxiv.org/abs/2410.01922) for more details.
 
 ***
 
