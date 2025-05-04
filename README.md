@@ -1,6 +1,8 @@
 ## NTK-DFL: Enhancing Decentralized Federated Learning in Heterogeneous Settings via Neural Tangent Kernel
 
-Update: 🙌 Happy to announce that we were accepted to ICML 2025! 🙌 Check out the manuscript [here](https://arxiv.org/abs/2410.01922).
+**Update:** 🙌 Happy to announce that we were accepted to ICML 2025 🙌! Check out the manuscript [here](https://arxiv.org/abs/2410.01922) for more details.
+
+***
 
 ### Introduction
 We introduce NTK-DFL, a decentralized federated learning paradigm that makes use of neural tangent kernel weight evolution.
