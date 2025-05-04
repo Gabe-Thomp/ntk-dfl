@@ -45,8 +45,6 @@ To use a non-IID $\alpha=0.1$ partition for Fashion-MNIST, modify the `config.ya
 ```
 user_data_dir: data/user_with_data/fmnist300/a0.1/user_dataidx_map_0.10_0.dat
 ```
-<br />
-
 ### File Structure
 ```
 ntk-dfl/
