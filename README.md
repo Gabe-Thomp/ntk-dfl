@@ -47,3 +47,18 @@ user_data_dir: data/user_with_data/fmnist300/a0.1/user_dataidx_map_0.10_0.dat
 ```
 <br />
 
+### File Structure
+```
+ntk-dfl/
+├── ablations/              # Static topology code
+├── baselines/              # Contains implementations of baselines
+│   ├── dfedavg/
+│   │   ├── gridsearch_dfedavg.py
+│   │   ├── dfedavgm.py
+│   │   └── dfedavgm_quantize.py
+│   └── ...                 # Other baseline methods
+├── data/                   # Benchmark datasets used in the paper
+├── fedlearning/            # Core code for federated learning experiments
+├── utils/                  # Utility functions and config templates for NTK-DFL and baselines
+└── main.py                 # Script to run the NTK-DFL algorithm
+```
