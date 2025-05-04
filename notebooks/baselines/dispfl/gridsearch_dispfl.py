@@ -3,8 +3,17 @@ import itertools
 import subprocess
 
 # Define the hyperparameter space
-# Replace this fp list with the list of user_with_data files you want to use
-user_with_data_fps = ["../../../data/user_with_data/emnist/digits/user_dataidx_map_0.dat"]
+# alhpa = 0.1, 0.5, for 3 trials
+# user_with_data_fps = [f"/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/fmnist300/a0.{i}/user_dataidx_map_0.{i}0_{j}.dat" for i in [1,5] for j in range(0, 1)]
+# user_with_data_fps = [f"/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/fmnist300/a0.{i}/user_dataidx_map_0.{i}0_0.dat" for i in range(1,6)]
+# Add IID fp
+# user_with_data_fps.append("")
+
+# user_with_data_fps = ["/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/mnist300/a0.05/user_dataidx_map_0.05_0.dat", 
+# "/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/mnist300/a0.1/user_dataidx_map_0.10_0.dat",
+# "/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/mnist300/a0.5/user_dataidx_map_0.50_0.dat"]
+
+user_with_data_fps = ["/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/emnist/digits/user_dataidx_map_0.dat"]
 
 param_grid = {
     'lr': [0.1],
@@ -40,8 +49,8 @@ def update_yaml(file_path, params):
     with open(file_path, 'w') as file:
         yaml.dump(config, file)
 
-# Note: replace this with your own path to the config file
-yaml_file_path = "ADD_YOUR_PATH/Deep_Learning/ntk_dfl/utils/baseline_configs/config_dispfl.yaml"
+# yaml_file_path = "/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/utils/baseline_configs/config_dispfl.yaml"
+yaml_file_path = "/home/gathomp3/Deep_Learning/NeuralTangent/records/baseline_trials/dispfl/quantization_trials/trial1/config1.yaml"
 
 # Loop through all combinations and run the model for each set
 for params in param_combinations:
@@ -49,7 +58,7 @@ for params in param_combinations:
     
     # Run your model script that uses the YAML file
     # This could be a Python script executed from the terminal, or any other executable
-    dispfl_main_fp = "./DisPFL/fedml_experiments/standalone/DisPFL/main_dispfl.py"
+    dispfl_main_fp = "/home/gathomp3/Deep_Learning/NeuralTangent/dispfl/DisPFL/fedml_experiments/standalone/DisPFL/main_dispfl.py"
     command = ['python', dispfl_main_fp, "--config", yaml_file_path]
     subprocess.run(command)
     

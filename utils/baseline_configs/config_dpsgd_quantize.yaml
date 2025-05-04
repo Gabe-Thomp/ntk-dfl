@@ -4,7 +4,7 @@ debug: true
 
 
 # users:         
-rounds: 30
+rounds: 1000
 users: 300
 
 # DFedAvgM hyperparameters
@@ -25,7 +25,9 @@ static: false
 
 graph_name:
 p:
-d: 9
+d: 5
+
+quant_level: 256 # This is the quantization level for the quantization of weights.
 
 # Number of datapoints per user
 local_batch_size: 200
@@ -67,9 +69,9 @@ channels: 1
 label_size: 10
 
 # Log and record configurations
-record_dir: "/home/gathomp3/Deep_Learning/NeuralTangent/records/baseline_trials/dpsgd/trial9/{}.dat"
+record_dir: "/home/gathomp3/Deep_Learning/NeuralTangent/records/baseline_trials/dpsgd/quantization_trials/trial1/{}.dat"
 log_level: "INFO"
-log_file: "../../records/baseline_trials/dpsgd/trial9/train.log"
+log_file: "/home/gathomp3/Deep_Learning/NeuralTangent/records/baseline_trials/dpsgd/quantization_trials/trial1/train.log"
 
 model: "mlp"
 full_weight_dir: ""

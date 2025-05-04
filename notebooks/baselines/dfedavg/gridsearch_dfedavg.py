@@ -4,9 +4,13 @@ import subprocess
 
 # Define the hyperparameter space
 # alhpa = 0.1, 0.5, for 3 trials
-user_with_data_fps = [f"../../../data/user_with_data/fmnist300/a0.{i}/user_dataidx_map_0.{i}0_{j}.dat" for i in [1,5] for j in range(0, 3)]
+# user_with_data_fps = [f"../../../data/user_with_data/fmnist300/a0.{i}/user_dataidx_map_0.{i}0_{j}.dat" for i in [1,5] for j in range(0, 3)]
 # Add IID fp
 # user_with_data_fps.append("")
+
+user_with_data_fps = ["/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/mnist300/a0.05/user_dataidx_map_0.05_0.dat", 
+"/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/mnist300/a0.1/user_dataidx_map_0.10_0.dat",
+"/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/data/user_with_data/mnist300/a0.5/user_dataidx_map_0.50_0.dat"]
 
 param_grid = {
     'lr': [0.1],
@@ -45,8 +49,7 @@ def update_yaml(file_path, params):
     with open(file_path, 'w') as file:
         yaml.dump(config, file)
 
-# Note: replace this with your own path to the config file
-yaml_file_path = "ADD_YOUR_PATH/ntk_dfl/utils/baseline_configs/config_dfedavg.yaml"
+yaml_file_path = "/home/gathomp3/Deep_Learning/NeuralTangent/ntk-fed/utils/baseline_configs/config_dfedavg.yaml"
 
 # Loop through all combinations and run the model for each set
 for params in param_combinations:
